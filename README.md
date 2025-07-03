@@ -109,7 +109,7 @@ python project_lidar_to_camera.py
 - Depth-based visualization
 
 **Sample Output:**
-![LiDAR-to-Camera Projection](output/lidar_projection_frame_000000.png)
+![LiDAR-to-Camera Projection](output/lidar_projection_frame_000010.png)
 
 **Statistics Example:**
 ```
