@@ -16,8 +16,6 @@ This repository explores fundamental perception tasks in autonomous driving by i
 - **Sensor Fusion**: Project 3D LiDAR points onto 2D camera images
 - **Depth-based Color Coding**: Visualize distance information intuitively
 - **Ground Segmentation**: Identify and remove ground plane for object focus
-- **Professional Documentation**: Clean, well-documented code with type hints
-- **Modular Design**: Reusable components for different perception tasks
 
 ## 📁 Project Structure
 
@@ -74,44 +72,83 @@ pip install -r requirements.txt
        └── timestamps.txt
    ```
 
-## 🚀 Usage
+## 🚀 Scripts and Usage
 
-### 1. Basic Data Loading and Visualization
+### 1. load_data.py - Data Loading and 3D Visualization
 
+#### Description
+The foundational script that demonstrates how to load and visualize KITTI dataset components. This script parses calibration files, loads LiDAR point clouds from binary files, and creates interactive 3D visualizations using Open3D.
+
+#### What it does:
+- Parses KITTI calibration files (calib_cam_to_cam.txt, calib_velo_to_cam.txt)
+- Loads LiDAR point cloud data from .bin files
+- Creates interactive 3D point cloud visualization
+- Displays point cloud with coordinate axes and proper scaling
+
+#### Dependencies:
+- `numpy` - For numerical array operations
+- `open3d` - For 3D visualization and point cloud processing
+- `os` - For file path operations
+- `glob` - For file pattern matching
+
+#### How to run:
 ```bash
 python load_data.py
 ```
 
-**What it does:**
-- Loads KITTI calibration files
-- Reads a single LiDAR point cloud
-- Opens interactive 3D visualization
+#### Expected Output:
+- Interactive 3D viewer window opens with the point cloud
+- Console output showing number of points loaded
+- Ability to rotate, zoom, and pan the 3D view
 
-**Sample Output:**
-![Point Cloud Visualization](output/point_cloud_sample.png)
+![3D Point Cloud Visualization](output/point_cloud_visualization.png)
 
-### 2. LiDAR-to-Camera Projection
+*Interactive 3D visualization of KITTI LiDAR point cloud showing the street scene from the vehicle's perspective*
 
+---
+
+### 2. project_lidar_to_camera.py - LiDAR-to-Camera Projection
+
+#### Description
+The core sensor fusion script that demonstrates how to project 3D LiDAR points onto 2D camera images. This is a fundamental task in autonomous vehicle perception, enabling the combination of depth information from LiDAR with visual information from cameras.
+
+#### What it does:
+- Loads synchronized camera images and LiDAR point clouds
+- Applies coordinate system transformations (Velodyne → Camera → Image)
+- Projects 3D points to 2D image coordinates using calibration matrices
+- Filters points that fall within image boundaries
+- Color-codes projected points by depth (red = close, blue = far)
+- Saves the final projection result as an image
+
+#### Dependencies:
+- `numpy` - For matrix operations and numerical computing
+- `opencv-python` - For image processing and display
+- `matplotlib` - For color mapping and visualization
+- `glob` - For file management
+- `typing` - For type hints
+
+#### How to run:
 ```bash
 python project_lidar_to_camera.py
 ```
 
-**What it does:**
-- Loads synchronized camera and LiDAR data
-- Projects 3D LiDAR points onto 2D camera image
-- Color-codes points by depth (red = close, blue = far)
-- Saves projection result
+#### Configuration:
+Update the `data_path` variable in the `main()` function to point to your KITTI dataset location.
 
-**Key Features:**
-- Proper coordinate system transformations
-- Calibration matrix handling
-- Point filtering for image bounds
-- Depth-based visualization
+#### Expected Output:
+- Console output with projection statistics
+- Saved image in `output/` directory
+- Optional display window showing the projection result
 
+<<<<<<< HEAD
 **Sample Output:**
+=======
+>>>>>>> 6649f89 (feat: Implement RANSAC for ground plane segmentation.)
 ![LiDAR-to-Camera Projection](output/lidar_projection_frame_000010.png)
 
-**Statistics Example:**
+*LiDAR points projected onto camera image with depth-based color coding. Red points are closer objects, blue points are farther away*
+
+#### Sample Statistics:
 ```
 Projection Statistics:
   Total LiDAR points: 124,668
@@ -120,48 +157,47 @@ Projection Statistics:
   Average depth: 12.34 meters
 ```
 
-**Sample Output:**
-![Ground Segmentation](output/ground_segmentation_frame_000000.png)
+---
 
-## 📈 Results and Performance
+### 3. segment_ground.py - Ground Plane Segmentation
 
-### LiDAR-to-Camera Projection Results
+#### Description
+An advanced perception script that implements RANSAC-based ground plane detection and segmentation. This technique is crucial for autonomous vehicles to distinguish between the road surface and obstacles/objects that need to be avoided.
 
-| Metric | Value |
-|--------|-------|
-| **Processing Time** | ~0.15 seconds per frame |
-| **Projection Accuracy** | Sub-pixel precision |
-| **Valid Points Ratio** | ~6.5% (points within image bounds) |
-| **Depth Range** | 2-50 meters |
+#### What it does:
+- Loads LiDAR point cloud data
+- Applies RANSAC algorithm to detect the dominant ground plane
+- Segments points into ground vs. non-ground categories
+- Creates visualization with different colors for ground (gray) and objects (red)
+- Saves segmentation results and statistics
 
-### Ground Segmentation Results
+#### Dependencies:
+- `numpy` - For numerical operations
+- `open3d` - For 3D processing and RANSAC implementation
+- `matplotlib` - For visualization and color mapping
+- `os` - For file operations
 
-| Metric | Value |
-|--------|-------|
-| **Ground Detection Rate** | 95.2% accuracy |
-| **Processing Time** | ~0.08 seconds per frame |
-| **False Positive Rate** | 2.1% |
-| **Plane Fitting Error** | 0.18 meters RMSE |
-
-## 🔧 Technical Implementation
-
-### Coordinate System Transformations
-
-The LiDAR-to-Camera projection involves several coordinate transformations:
-
-1. **Velodyne → Camera**: `T_velo_to_cam` matrix
-2. **Rectification**: `R_rect` matrix for lens correction
-3. **Projection**: `P_rect` matrix for 3D → 2D conversion
-
-### Mathematical Foundation
-
-```python
-# Transformation pipeline
-points_3d_homo = [x, y, z, 1]  # Homogeneous coordinates
-points_cam = T_velo_to_cam @ points_3d_homo  # Transform to camera frame
-points_rect = R_rect @ points_cam  # Apply rectification
-points_2d = P_rect @ points_rect  # Project to image plane
+#### How to run:
+```bash
+python segment_ground.py
 ```
+
+#### Algorithm Parameters:
+- **Distance threshold**: 0.2 meters (points within this distance are considered part of the plane)
+- **RANSAC iterations**: 1000 (maximum number of iterations for plane fitting)
+- **Minimum plane points**: 1000 (minimum number of points required for a valid plane)
+
+#### Expected Output:
+- Console output with segmentation statistics
+- Interactive 3D visualization showing ground vs. objects
+- Saved segmentation result images from multiple views
+
+![Analysis View](output/ground_segmentation_analysis_frame_000000.png)
+![Front View](output/ground_segmentation_front_frame_000000.png)
+![Side View](output/ground_segmentation_side_frame_000000.png)
+![Top View](output/ground_segmentation_top_frame_000000.png)
+
+*Multiple views of ground plane segmentation: analysis, front, side, and top perspectives help visualize how the algorithm distinguishes ground points (gray) from obstacles (red).*
 
 
 
@@ -170,6 +206,7 @@ points_2d = P_rect @ points_rect  # Project to image plane
 - [KITTI Dataset Paper](http://www.cvlibs.net/publications/Geiger2013IJRR.pdf)
 - [Computer Vision: Algorithms and Applications](http://szeliski.org/Book/)
 - [Multiple View Geometry](https://www.robots.ox.ac.uk/~vgg/hzbook/)
+<<<<<<< HEAD
 
 ## 🤝 Contributing
 
@@ -196,3 +233,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 **Made with ❤️ for autonomous vehicle perception research**
 
 *Star ⭐ this repository if you find it useful!*
+=======
+>>>>>>> 6649f89 (feat: Implement RANSAC for ground plane segmentation.)
