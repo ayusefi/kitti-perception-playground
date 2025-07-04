@@ -8,7 +8,7 @@ This repository explores fundamental perception tasks in autonomous driving by i
 - **LiDAR-to-Camera Projection**: Sensor fusion between 3D LiDAR and 2D camera data
 - **Ground Plane Segmentation**: RANSAC-based ground removal for object detection
 - **3D Point Cloud Visualization**: Interactive visualization of LiDAR data
-- **Multi-modal Data Synchronization**: Timestamp alignment between sensors
+- **Object Clustering & Filtering**: DBSCAN clustering with bounding‑box based filtering
 
 ## 🎯 Key Features
 
@@ -16,23 +16,34 @@ This repository explores fundamental perception tasks in autonomous driving by i
 - **Sensor Fusion**: Project 3D LiDAR points onto 2D camera images
 - **Depth-based Color Coding**: Visualize distance information intuitively
 - **Ground Segmentation**: Identify and remove ground plane for object focus
+- **Object Clustering**: Cluster non‑ground points via DBSCAN
+- **Bounding‑Box Filtering**: Keep only clusters meeting volume and point‑count thresholds
+- **Top‑View & Interactive Visuals**: Save overhead snapshots and launch 3D viewer
 
 ## 📁 Project Structure
 
 ```
-kitti-perception-playground/
+kitti‑perception‑playground/
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
-├── load_data.py              # Data loading and basic visualization
-├── project_lidar_to_camera.py # LiDAR-to-Camera projection
-├── segment_ground.py         # Ground plane segmentation
-├── output/                   # Generated visualizations
+├── load_data.py                # Data loading and basic visualization
+├── project_lidar_to_camera.py  # LiDAR‑to‑Camera projection
+├── segment_ground.py           # Ground plane segmentation
+├── cluster_objects.py          # Object clustering & filtering pipeline
+├── output/                     # Generated visualizations
+│   ├── point_cloud_*.png
 │   ├── lidar_projection_*.png
 │   ├── ground_segmentation_*.png
-│   └── point_cloud_*.png
-└── data/                     # KITTI dataset (not tracked in git)
+│   └── perception_pipeline_frame_*.png
+└── data/                       # KITTI dataset (not tracked in git)
     └── 2011_09_26_drive_0001_sync/
+        ├── calib_cam_to_cam.txt
+        ├── calib_velo_to_cam.txt
+        ├── image_02/data/
+        ├── image_02/timestamps.txt
+        ├── velodyne_points/data/
+        └── velodyne_points/timestamps.txt
 ```
 
 ## 🛠️ Installation
