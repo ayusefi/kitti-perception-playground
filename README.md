@@ -140,10 +140,7 @@ Update the `data_path` variable in the `main()` function to point to your KITTI 
 - Saved image in `output/` directory
 - Optional display window showing the projection result
 
-<<<<<<< HEAD
 **Sample Output:**
-=======
->>>>>>> 6649f89 (feat: Implement RANSAC for ground plane segmentation.)
 ![LiDAR-to-Camera Projection](output/lidar_projection_frame_000010.png)
 
 *LiDAR points projected onto camera image with depth-based color coding. Red points are closer objects, blue points are farther away*
@@ -199,39 +196,53 @@ python segment_ground.py
 
 *Multiple views of ground plane segmentation: analysis, front, side, and top perspectives help visualize how the algorithm distinguishes ground points (gray) from obstacles (red).*
 
+### 4. cluster\_objects.py – Object Clustering & Filtering
 
+**Description:**
+A complete clustering pipeline wrapped in a `PerceptionPipeline` class:
+
+1. Load & remove ground points using RANSAC
+2. Cluster non‑ground points via DBSCAN
+3. Filter clusters by bounding‑box volume and point count
+4. Save a top‑view PNG snapshot
+5. Launch an interactive Open3D 3D viewer
+
+**Dependencies:**
+
+* `numpy`
+* `open3d`
+* `os`
+
+**How to run:**
+
+```bash
+python cluster_objects.py
+```
+
+**Configuration:**
+Override defaults by passing a `config` dict into `PerceptionPipeline`:
+
+```python
+custom_config = {
+  'filter': {'min_volume': 2.0, 'min_points': 30},
+  'dbscan': {'eps': 0.5, 'min_points': 15}
+}
+pipeline = PerceptionPipeline(data_path, custom_config)
+```
+
+**Expected Output:**
+
+* Console logs of each processing step
+* Top‑view image saved to `output/perception_pipeline_frame_000010.png`
+* Interactive 3D window with colored clusters and bounding boxes
+
+![Clustering Top View](output/perception_pipeline_frame_000010.png)
+
+---
 
 ## 📚 References
 
 - [KITTI Dataset Paper](http://www.cvlibs.net/publications/Geiger2013IJRR.pdf)
 - [Computer Vision: Algorithms and Applications](http://szeliski.org/Book/)
 - [Multiple View Geometry](https://www.robots.ox.ac.uk/~vgg/hzbook/)
-<<<<<<< HEAD
 
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- **KITTI Dataset**: Karlsruhe Institute of Technology
-- **Open3D**: Open-source 3D data processing library
-- **OpenCV**: Computer vision library
-- **NumPy**: Numerical computing foundation
-
----
-
-**Made with ❤️ for autonomous vehicle perception research**
-
-*Star ⭐ this repository if you find it useful!*
-=======
->>>>>>> 6649f89 (feat: Implement RANSAC for ground plane segmentation.)
