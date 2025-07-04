@@ -192,10 +192,10 @@ python segment_ground.py
 - Interactive 3D visualization showing ground vs. objects
 - Saved segmentation result images from multiple views
 
-![Analysis View](output/ground_segmentation_analysis_frame_000000.png)
-![Front View](output/ground_segmentation_front_frame_000000.png)
-![Side View](output/ground_segmentation_side_frame_000000.png)
-![Top View](output/ground_segmentation_top_frame_000000.png)
+![Analysis View](output/ground_segmentation_analysis_frame_000010.png)
+![Front View](output/ground_segmentation_front_frame_000010.png)
+![Side View](output/ground_segmentation_side_frame_000010.png)
+![Top View](output/ground_segmentation_top_frame_000010.png)
 
 *Multiple views of ground plane segmentation: analysis, front, side, and top perspectives help visualize how the algorithm distinguishes ground points (gray) from obstacles (red).*
 

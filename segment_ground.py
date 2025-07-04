@@ -306,7 +306,7 @@ def main():
     
     # Configuration
     data_path = "data/2011_09_26_drive_0001_sync/2011_09_26/2011_09_26_drive_0001_sync"  # Adjust this path
-    frame_idx = 0  # Frame to process
+    frame_idx = 10  # Frame to process
     output_dir = "output"
     
     # Create output directory
