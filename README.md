@@ -249,6 +249,54 @@ pipeline = PerceptionPipeline(data_path, custom_config)
 
 ![Clustering Top View](output/perception_pipeline_frame_000010.png)
 
+
+## 🔍 3D Object Tracking
+
+A **multi-object tracking module** is integrated into the perception pipeline. It uses Kalman filtering and nearest neighbor association to follow 3D objects over time in the top-down LiDAR view.
+
+### ✨ Key Features
+
+* **Kalman Filter Per Track**: Each object is tracked using an independent Kalman filter estimating 3D position and velocity.
+* **Nearest Neighbor Association**: Objects are matched across frames using minimum Euclidean distance.
+* **Track Lifecycle Management**:
+
+  * New detections spawn *tentative* tracks (triangle markers).
+  * Tracks confirmed after 3 hits become *confirmed* (circle markers).
+  * Tracks are deleted if not matched for 5 frames.
+* **Consistent Visualization**:
+
+  * Fixed axis limits for spatial consistency across frames (X: −90 to 90, Y: −40 to 60).
+  * Bounding boxes show object dimensions.
+  * Velocity arrows and track IDs are annotated.
+  * Legend describes marker styles.
+* **Animated Output**:
+
+  * Each frame is saved with bounding boxes, IDs, and motion vectors.
+  * Frames are compiled into a `.gif` for easy visual inspection.
+
+### 🎥 Tracking Demo
+
+![3D Object Tracking GIF](output/tracking/tracking.gif)
+
+> *An overhead view of tracked clusters across frames. Confirmed tracks are circles, tentative tracks are triangles, and gray dots represent clustered LiDAR points.*
+
+### 🧠 Algorithmic Flow
+
+1. **Detection Input**: Each frame provides object detections from the clustering pipeline.
+2. **Predict**: Each track predicts its next state using its Kalman model.
+3. **Associate**: New detections are matched to predicted track positions using nearest neighbor matching with a distance threshold.
+4. **Update**: Matches update the track's state; unmatched detections create new tentative tracks.
+5. **Prune**: Tracks without matches for >5 frames are removed.
+
+### 🧪 Run It
+
+```bash
+python multi_object_tracking_demo.py
+```
+
+* Ensure the KITTI dataset is downloaded to `data/`.
+* GIF is saved to `output/tracking/tracking.gif`.
+
 ---
 
 ## 📚 References
