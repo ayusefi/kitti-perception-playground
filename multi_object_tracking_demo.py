@@ -201,7 +201,7 @@ def main():
     viz = TrackingVisualizer(tracker, xlim, ylim)
     out_dir = "output/tracking"; os.makedirs(out_dir, exist_ok=True)
     frames = []
-    start, end = 1, 50
+    start, end = 1, 100
     for i in range(start, end+1):
         fr = pipeline.process_single_frame(i)
         tracker.update(fr.detections)
@@ -213,7 +213,7 @@ def main():
         fig.savefig(path, dpi=150); plt.close(fig)
         frames.append(imageio.imread(path))
     gif_path = os.path.join(out_dir, 'tracking.gif')
-    imageio.mimsave(gif_path, frames, duration=0.5)
+    imageio.mimsave("tracking.gif", frames, duration=0.5, loop=0)
     print(f"Saved GIF: {gif_path}")
 
 if __name__=='__main__': main()

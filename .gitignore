@@ -4,6 +4,8 @@
 # Dataset files
 data/
 
+frm_*.png
+
 # Python cache
 __pycache__/
 *.pyc
