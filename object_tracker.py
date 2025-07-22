@@ -387,6 +387,10 @@ class TrackingVisualizer:
         self.tracker = tracker
         self.fig, self.ax = plt.subplots(figsize=(12, 8))
         self.colors = plt.cm.Set3(np.linspace(0, 1, 20))  # 20 different colors
+        
+        # Fixed axis limits for consistent frame size
+        self.x_min, self.x_max = -80, 80
+        self.y_min, self.y_max = -30, 50
     
     def plot_frame(self, detections: List[Detection], frame_idx: int) -> None:
         """
@@ -398,42 +402,91 @@ class TrackingVisualizer:
         """
         self.ax.clear()
         
-        # Plot detections
+        # Plot detections as red circles
         if detections:
             det_positions = np.array([det.center for det in detections])
-            # self.ax.scatter(det_positions[:, 0], det_positions[:, 1], 
-            #               c='red', s=100, alpha=0.7, label='Detections', marker='o')
+            self.ax.scatter(det_positions[:, 0], det_positions[:, 1], 
+                          c='red', s=100, alpha=0.7, label='Detections', marker='o')
+            
+            # Add detection IDs
+            for i, det in enumerate(detections):
+                self.ax.annotate(f'D{i}', (det.center[0], det.center[1]), 
+                               xytext=(5, 5), textcoords='offset points', fontsize=8, color='red')
         
-        # Plot tracks
+        # Plot tracks with different colors and trajectories
         for track in self.tracker.get_all_tracks():
             pos = track.get_position()
             track_color = self.colors[track.id % len(self.colors)]
             
-            # Plot current position
-            marker = 'o' if track.state == TrackState.CONFIRMED else '^'
-            # self.ax.scatter(pos[0], pos[1], c=[track_color], s=150, 
-            #               marker=marker, label=f'Track {track.id}')
+            # Plot current position with different markers for track states
+            if track.state == TrackState.CONFIRMED:
+                marker = 'o'
+                size = 150
+                alpha = 1.0
+            else:  # TENTATIVE
+                marker = '^'
+                size = 100
+                alpha = 0.6
             
-            # Plot trajectory
+            self.ax.scatter(pos[0], pos[1], c=[track_color], s=size, 
+                          marker=marker, alpha=alpha, edgecolors='black', linewidth=1)
+            
+            # Add track ID labels
+            self.ax.annotate(f'T{track.id}', (pos[0], pos[1]), 
+                           xytext=(5, -15), textcoords='offset points', 
+                           fontsize=10, fontweight='bold', color='black',
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor=track_color, alpha=0.7))
+            
+            # Plot trajectory history
             history = self.tracker.get_track_history(track.id)
             if len(history) > 1:
                 history_array = np.array(history)
                 self.ax.plot(history_array[:, 0], history_array[:, 1], 
-                           c=track_color, alpha=0.5, linewidth=2)
+                           c=track_color, alpha=0.8, linewidth=2, linestyle='-')
+                
+                # Add dots for historical positions
+                self.ax.scatter(history_array[:-1, 0], history_array[:-1, 1], 
+                              c=track_color, s=20, alpha=0.4)
             
-            # Plot velocity vector
+            # Plot velocity vector as arrow (shorter arrows)
             vel = track.get_velocity()
-            if np.linalg.norm(vel) > 0.1:  # Only show significant velocities
-                self.ax.arrow(pos[0], pos[1], vel[0], vel[1], 
-                            head_width=0.5, head_length=0.3, 
-                            fc=track_color, ec=track_color, alpha=0.7)
+            if np.linalg.norm(vel) > 0.5:  # Only show significant velocities
+                # Scale down the arrow length significantly
+                arrow_scale = 0.3  # Much shorter arrows
+                self.ax.arrow(pos[0], pos[1], vel[0] * arrow_scale, vel[1] * arrow_scale, 
+                            head_width=0.8, head_length=0.6, 
+                            fc=track_color, ec=track_color, alpha=0.8, linewidth=1.5)
         
-        self.ax.set_xlabel('X (meters)')
-        self.ax.set_ylabel('Y (meters)')
-        self.ax.set_title(f'Multi-Object Tracking - Frame {frame_idx}')
+        # Customize plot
+        self.ax.set_xlabel('X Position (meters)', fontsize=12)
+        self.ax.set_ylabel('Y Position (meters)', fontsize=12)
+        self.ax.set_title(f'Multi-Object Tracking - Frame {frame_idx}\n'
+                         f'Active Tracks: {len(self.tracker.get_active_tracks())}, '
+                         f'Detections: {len(detections)}', fontsize=14)
         self.ax.grid(True, alpha=0.3)
-        self.ax.axis('equal')
-        self.ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        # Use fixed axis limits for consistent frame size
+        self.ax.set_xlim(self.x_min, self.x_max)
+        self.ax.set_ylim(self.y_min, self.y_max)
+        
+        # Legend
+        legend_elements = []
+        if detections:
+            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
+                                            markerfacecolor='red', markersize=10, 
+                                            label='Detections', alpha=0.7))
+        if self.tracker.get_active_tracks():
+            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
+                                            markerfacecolor='blue', markersize=12, 
+                                            label='Confirmed Tracks'))
+        tentative_tracks = [t for t in self.tracker.tracks if t.state == TrackState.TENTATIVE]
+        if tentative_tracks:
+            legend_elements.append(plt.Line2D([0], [0], marker='^', color='w', 
+                                            markerfacecolor='gray', markersize=10, 
+                                            label='Tentative Tracks', alpha=0.6))
+        
+        if legend_elements:
+            self.ax.legend(handles=legend_elements, loc='upper right')
         
         plt.tight_layout()
     
@@ -449,6 +502,44 @@ class TrackingVisualizer:
         self.plot_frame(detections, frame_idx)
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
         print(f"Saved tracking visualization to {output_path}")
+    
+    def create_gif(self, frame_paths: List[str], output_path: str, duration: float = 0.5) -> None:
+        """
+        Create a GIF from saved frame images
+        
+        Args:
+            frame_paths: List of paths to frame images
+            output_path: Path to save the GIF
+            duration: Duration of each frame in seconds
+        """
+        try:
+            from PIL import Image
+            
+            # Load all images
+            images = []
+            for path in frame_paths:
+                if os.path.exists(path):
+                    img = Image.open(path)
+                    images.append(img)
+            
+            if images:
+                # Save as GIF
+                images[0].save(
+                    output_path,
+                    save_all=True,
+                    append_images=images[1:],
+                    duration=int(duration * 1000),  # Convert to milliseconds
+                    loop=0
+                )
+                print(f"✅ Created tracking GIF: {output_path}")
+                print(f"   📊 {len(images)} frames, {duration}s per frame")
+            else:
+                print("❌ No frame images found for GIF creation")
+                
+        except ImportError:
+            print("❌ PIL (Pillow) not available. Install with: pip install Pillow")
+        except Exception as e:
+            print(f"❌ Error creating GIF: {e}")
 
 
 def main():
@@ -480,8 +571,8 @@ def main():
     visualizer = TrackingVisualizer(tracker)
     
     # Process sequence
-    start_frame = 10
-    end_frame = 25
+    start_frame = 0
+    end_frame = 100
     
     try:
         print(f"Processing frames {start_frame} to {end_frame}...")
@@ -489,6 +580,9 @@ def main():
         # Create output directory
         output_dir = "output/tracking"
         os.makedirs(output_dir, exist_ok=True)
+        
+        # Track frame paths for GIF creation
+        frame_paths = []
         
         # Process each frame
         for frame_idx in range(start_frame, end_frame + 1):
@@ -507,10 +601,16 @@ def main():
             # Save visualization
             output_path = os.path.join(output_dir, f"tracking_frame_{frame_idx:06d}.png")
             visualizer.save_frame(detections, frame_idx, output_path)
+            frame_paths.append(output_path)
         
         print("\n" + "=" * 80)
         print("TRACKING COMPLETED SUCCESSFULLY!")
         print("=" * 80)
+        
+        # Create GIF from all frames
+        print(f"\n🎬 Creating tracking GIF...")
+        gif_path = "output/tracking.gif"  # Direct path to tracking.gif
+        visualizer.create_gif(frame_paths, gif_path, duration=0.2)
         
         # Final statistics
         print(f"\nFinal Statistics:")
@@ -522,6 +622,8 @@ def main():
         print(f"\nTrack lifetimes:")
         for track in tracker.get_all_tracks():
             print(f"  Track {track.id}: {track.age} frames, {track.hits} hits")
+        
+        print(f"\n📺 View the tracking animation at: {gif_path}")
         
     except Exception as e:
         print(f"Error in tracking: {e}")

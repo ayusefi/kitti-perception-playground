@@ -6,6 +6,10 @@ data/
 
 frm_*.png
 
+tracking_*.png
+
+objects/
+
 # Python cache
 __pycache__/
 *.pyc

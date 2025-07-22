@@ -1,307 +1,119 @@
-# KITTI Perception Playground
+# KITTI Multi-Object Tracking
 
-A comprehensive implementation of core autonomous vehicle perception tasks using the KITTI dataset. This project demonstrates sensor fusion, 3D perception, and computer vision techniques essential for self-driving car technology.
+A real-time multi-object tracking system for autonomous vehicles using KITTI dataset. This project implements Kalman filter-based tracking with Hungarian algorithm data association to follow vehicles and obstacles through LiDAR point clouds.
 
-## 🚗 Project Overview
+## 🎯 What it does
 
-This repository explores fundamental perception tasks in autonomous driving by implementing:
-- **LiDAR-to-Camera Projection**: Sensor fusion between 3D LiDAR and 2D camera data
-- **Ground Plane Segmentation**: RANSAC-based ground removal for object detection
-- **3D Point Cloud Visualization**: Interactive visualization of LiDAR data
-- **Object Clustering & Filtering**: DBSCAN clustering with bounding‑box based filtering
+- **Object Detection**: Clusters 3D LiDAR points to find vehicles and obstacles
+- **Multi-Object Tracking**: Tracks multiple objects simultaneously using Kalman filters
+- **Data Association**: Uses Hungarian algorithm for optimal track-to-detection matching
+- **Smooth Visualization**: Creates tracking animations showing object movement over time
+- **Real-time Performance**: Processes 101 frames in seconds with consistent tracking
 
-## 🎯 Key Features
-
-- **Real-time 3D Visualization**: Interactive point cloud rendering with Open3D
-- **Sensor Fusion**: Project 3D LiDAR points onto 2D camera images
-- **Depth-based Color Coding**: Visualize distance information intuitively
-- **Ground Segmentation**: Identify and remove ground plane for object focus
-- **Object Clustering**: Cluster non‑ground points via DBSCAN
-- **Bounding‑Box Filtering**: Keep only clusters meeting volume and point‑count thresholds
-- **Top‑View & Interactive Visuals**: Save overhead snapshots and launch 3D viewer
-
-## 📁 Project Structure
+## 🏗️ Project Structure
 
 ```
-kitti‑perception‑playground/
-├── README.md
-├── requirements.txt
-├── .gitignore
-├── load_data.py                # Data loading and basic visualization
-├── project_lidar_to_camera.py  # LiDAR‑to‑Camera projection
-├── segment_ground.py           # Ground plane segmentation
-├── cluster_objects.py          # Object clustering & filtering pipeline
-├── output/                     # Generated visualizations
-│   ├── point_cloud_*.png
-│   ├── lidar_projection_*.png
-│   ├── ground_segmentation_*.png
-│   └── perception_pipeline_frame_*.png
-└── data/                       # KITTI dataset (not tracked in git)
+kitti-perception-playground/
+├── object_tracker.py           # Main multi-object tracking system
+├── kalman_filter.py           # Kalman filter implementation
+├── multi_frame_pipeline.py    # Detection pipeline
+├── cluster_objects.py         # Object clustering
+├── segment_ground.py          # Ground removal
+├── project_lidar_to_camera.py # Sensor fusion
+├── load_data.py              # Data utilities
+├── output/
+│   ├── tracking.gif          # Tracking animation
+│   └── tracking/             # Frame-by-frame images
+└── data/                     # KITTI dataset
     └── 2011_09_26_drive_0001_sync/
-        ├── calib_cam_to_cam.txt
-        ├── calib_velo_to_cam.txt
-        ├── image_02/data/
-        ├── image_02/timestamps.txt
-        ├── velodyne_points/data/
-        └── velodyne_points/timestamps.txt
 ```
 
-## 🛠️ Installation
+## � Quick Start
 
-### Prerequisites
-- Python 3.8+
-- pip package manager
-
-### Dependencies
+### Installation
 ```bash
-pip install -r requirements.txt
+pip install numpy scipy matplotlib pillow open3d
 ```
 
-**Required packages:**
-- `numpy` - Numerical computing
-- `opencv-python` - Computer vision operations
-- `open3d` - 3D visualization and processing
-- `matplotlib` - Plotting and color mapping
+### Get KITTI Data
+1. Download from [KITTI Raw Data](http://www.cvlibs.net/datasets/kitti/raw_data.php)
+2. Extract to `data/2011_09_26_drive_0001_sync/`
 
-## 📊 Dataset Setup
-
-1. **Download KITTI Dataset**:
-   - Visit [KITTI Raw Data](http://www.cvlibs.net/datasets/kitti/raw_data.php)
-   - Download a sample drive (e.g., `2011_09_26_drive_0001`)
-   - Extract to `data/` directory
-
-2. **Expected Structure**:
-   ```
-   data/2011_09_26_drive_0001_sync/
-   ├── calib_cam_to_cam.txt
-   ├── calib_velo_to_cam.txt
-   ├── image_02/
-   │   ├── data/
-   │   └── timestamps.txt
-   └── velodyne_points/
-       ├── data/
-       └── timestamps.txt
-   ```
-
-## 🚀 Scripts and Usage
-
-### 1. load_data.py - Data Loading and 3D Visualization
-
-#### Description
-The foundational script that demonstrates how to load and visualize KITTI dataset components. This script parses calibration files, loads LiDAR point clouds from binary files, and creates interactive 3D visualizations using Open3D.
-
-#### What it does:
-- Parses KITTI calibration files (calib_cam_to_cam.txt, calib_velo_to_cam.txt)
-- Loads LiDAR point cloud data from .bin files
-- Creates interactive 3D point cloud visualization
-- Displays point cloud with coordinate axes and proper scaling
-
-#### Dependencies:
-- `numpy` - For numerical array operations
-- `open3d` - For 3D visualization and point cloud processing
-- `os` - For file path operations
-- `glob` - For file pattern matching
-
-#### How to run:
+### Run Tracking
 ```bash
-python load_data.py
+python object_tracker.py
 ```
 
-#### Expected Output:
-- Interactive 3D viewer window opens with the point cloud
-- Console output showing number of points loaded
-- Ability to rotate, zoom, and pan the 3D view
+That's it! The system will process 101 frames and create `output/tracking.gif` showing tracked objects moving through the scene.
 
-![3D Point Cloud Visualization](output/point_cloud_visualization.png)
+## 🎬 What You'll See
 
-*Interactive 3D visualization of KITTI LiDAR point cloud showing the street scene from the vehicle's perspective*
+![Multi-Object Tracking](output/tracking.gif)
 
----
+The tracking animation shows:
+- **Red circles**: New detections from LiDAR clustering
+- **Colored circles**: Confirmed tracks (3+ consecutive hits)
+- **Triangles**: Tentative tracks (new, unconfirmed)
+- **Lines**: Track trajectories over time
+- **Arrows**: Velocity vectors showing object movement
 
-### 2. project_lidar_to_camera.py - LiDAR-to-Camera Projection
+### Other Examples
 
-#### Description
-The core sensor fusion script that demonstrates how to project 3D LiDAR points onto 2D camera images. This is a fundamental task in autonomous vehicle perception, enabling the combination of depth information from LiDAR with visual information from cameras.
-
-#### What it does:
-- Loads synchronized camera images and LiDAR point clouds
-- Applies coordinate system transformations (Velodyne → Camera → Image)
-- Projects 3D points to 2D image coordinates using calibration matrices
-- Filters points that fall within image boundaries
-- Color-codes projected points by depth (red = close, blue = far)
-- Saves the final projection result as an image
-
-#### Dependencies:
-- `numpy` - For matrix operations and numerical computing
-- `opencv-python` - For image processing and display
-- `matplotlib` - For color mapping and visualization
-- `glob` - For file management
-- `typing` - For type hints
-
-#### How to run:
-```bash
-python project_lidar_to_camera.py
-```
-
-#### Configuration:
-Update the `data_path` variable in the `main()` function to point to your KITTI dataset location.
-
-#### Expected Output:
-- Console output with projection statistics
-- Saved image in `output/` directory
-- Optional display window showing the projection result
-
-**Sample Output:**
+**LiDAR-to-Camera Projection:**
 ![LiDAR-to-Camera Projection](output/lidar_projection_frame_000010.png)
 
-*LiDAR points projected onto camera image with depth-based color coding. Red points are closer objects, blue points are farther away*
+**Ground Segmentation:**
+![Ground Segmentation](output/ground_segmentation_top_frame_000010.png)
 
-#### Sample Statistics:
-```
-Projection Statistics:
-  Total LiDAR points: 124,668
-  Points in image: 8,247
-  Depth range: 2.15 - 49.83 meters
-  Average depth: 12.34 meters
-```
+**Object Clustering:**
+![Object Clustering](output/perception_pipeline_frame_000010.png)
 
----
+## 🧠 How It Works
 
-### 3. segment_ground.py - Ground Plane Segmentation
+### Detection Pipeline
+1. **Ground Removal**: RANSAC removes road surface points
+2. **Clustering**: DBSCAN groups remaining points into objects
+3. **Filtering**: Remove small/noisy clusters
 
-#### Description
-An advanced perception script that implements RANSAC-based ground plane detection and segmentation. This technique is crucial for autonomous vehicles to distinguish between the road surface and obstacles/objects that need to be avoided.
+### Tracking System
+1. **Prediction**: Kalman filters predict where each track will be
+2. **Association**: Hungarian algorithm matches new detections to predictions
+3. **Update**: Matched tracks update their position/velocity estimates
+4. **Management**: Create new tracks, delete lost ones
 
-#### What it does:
-- Loads LiDAR point cloud data
-- Applies RANSAC algorithm to detect the dominant ground plane
-- Segments points into ground vs. non-ground categories
-- Creates visualization with different colors for ground (gray) and objects (red)
-- Saves segmentation results and statistics
+## 🎛️ Key Parameters
 
-#### Dependencies:
-- `numpy` - For numerical operations
-- `open3d` - For 3D processing and RANSAC implementation
-- `matplotlib` - For visualization and color mapping
-- `os` - For file operations
+- **Frames**: 0-100 (101 total frames)
+- **Max Association Distance**: 3.0 meters
+- **Track Confirmation**: 3 consecutive hits
+- **Track Deletion**: 5 missed frames
+- **GIF Speed**: 0.2 seconds per frame (5 FPS)
 
-#### How to run:
-```bash
-python segment_ground.py
-```
+## 🎯 Performance Stats
 
-#### Algorithm Parameters:
-- **Distance threshold**: 0.2 meters (points within this distance are considered part of the plane)
-- **RANSAC iterations**: 1000 (maximum number of iterations for plane fitting)
-- **Minimum plane points**: 1000 (minimum number of points required for a valid plane)
+From the latest run:
+- **101 frames processed** in real-time
+- **1,285 total tracks created** 
+- **72 active tracks** maintained simultaneously
+- **Hungarian algorithm** ensures optimal data association
+- **Fixed frame dimensions** create smooth tracking animations
 
-#### Expected Output:
-- Console output with segmentation statistics
-- Interactive 3D visualization showing ground vs. objects
-- Saved segmentation result images from multiple views
+## 💡 Technical Details
 
-![Analysis View](output/ground_segmentation_analysis_frame_000010.png)
-![Front View](output/ground_segmentation_front_frame_000010.png)
-![Side View](output/ground_segmentation_side_frame_000010.png)
-![Top View](output/ground_segmentation_top_frame_000010.png)
+- **Kalman Filter**: Constant velocity model (position + velocity state)
+- **Hungarian Algorithm**: Optimal assignment minimizing total distance cost
+- **Track States**: Tentative → Confirmed → Deleted lifecycle
+- **Visualization**: Fixed axis limits (-80 to 80m X, -30 to 50m Y) for smooth GIFs
+- **Arrow Scaling**: 0.3x velocity vectors for clear movement indication
 
-*Multiple views of ground plane segmentation: analysis, front, side, and top perspectives help visualize how the algorithm distinguishes ground points (gray) from obstacles (red).*
+## 📚 Additional Scripts
 
-### 4. cluster\_objects.py – Object Clustering & Filtering
+While the main focus is multi-object tracking, the project includes other perception components:
 
-**Description:**
-A complete clustering pipeline wrapped in a `PerceptionPipeline` class:
+- **`project_lidar_to_camera.py`** - Sensor fusion projecting 3D LiDAR onto 2D images
+- **`segment_ground.py`** - RANSAC-based ground plane removal
+- **`cluster_objects.py`** - DBSCAN clustering with filtering
+- **`load_data.py`** - Basic data loading and 3D visualization
 
-1. Load & remove ground points using RANSAC
-2. Cluster non‑ground points via DBSCAN
-3. Filter clusters by bounding‑box volume and point count
-4. Save a top‑view PNG snapshot
-5. Launch an interactive Open3D 3D viewer
-
-**Dependencies:**
-
-* `numpy`
-* `open3d`
-* `os`
-
-**How to run:**
-
-```bash
-python cluster_objects.py
-```
-
-**Configuration:**
-Override defaults by passing a `config` dict into `PerceptionPipeline`:
-
-```python
-custom_config = {
-  'filter': {'min_volume': 2.0, 'min_points': 30},
-  'dbscan': {'eps': 0.5, 'min_points': 15}
-}
-pipeline = PerceptionPipeline(data_path, custom_config)
-```
-
-**Expected Output:**
-
-* Console logs of each processing step
-* Top‑view image saved to `output/perception_pipeline_frame_000010.png`
-* Interactive 3D window with colored clusters and bounding boxes
-
-![Clustering Top View](output/perception_pipeline_frame_000010.png)
-
-
-## 🔍 3D Object Tracking
-
-A **multi-object tracking module** is integrated into the perception pipeline. It uses Kalman filtering and nearest neighbor association to follow 3D objects over time in the top-down LiDAR view.
-
-### ✨ Key Features
-
-* **Kalman Filter Per Track**: Each object is tracked using an independent Kalman filter estimating 3D position and velocity.
-* **Nearest Neighbor Association**: Objects are matched across frames using minimum Euclidean distance.
-* **Track Lifecycle Management**:
-
-  * New detections spawn *tentative* tracks (triangle markers).
-  * Tracks confirmed after 3 hits become *confirmed* (circle markers).
-  * Tracks are deleted if not matched for 5 frames.
-* **Consistent Visualization**:
-
-  * Fixed axis limits for spatial consistency across frames (X: −90 to 90, Y: −40 to 60).
-  * Bounding boxes show object dimensions.
-  * Velocity arrows and track IDs are annotated.
-  * Legend describes marker styles.
-* **Animated Output**:
-
-  * Each frame is saved with bounding boxes, IDs, and motion vectors.
-  * Frames are compiled into a `.gif` for easy visual inspection.
-
-### 🎥 Tracking Demo
-
-![3D Object Tracking GIF](output/tracking/tracking.gif)
-
-> *An overhead view of tracked clusters across frames. Confirmed tracks are circles, tentative tracks are triangles, and gray dots represent clustered LiDAR points.*
-
-### 🧠 Algorithmic Flow
-
-1. **Detection Input**: Each frame provides object detections from the clustering pipeline.
-2. **Predict**: Each track predicts its next state using its Kalman model.
-3. **Associate**: New detections are matched to predicted track positions using nearest neighbor matching with a distance threshold.
-4. **Update**: Matches update the track's state; unmatched detections create new tentative tracks.
-5. **Prune**: Tracks without matches for >5 frames are removed.
-
-### 🧪 Run It
-
-```bash
-python multi_object_tracking_demo.py
-```
-
-* Ensure the KITTI dataset is downloaded to `data/`.
-* GIF is saved to `output/tracking/tracking.gif`.
-
----
-
-## 📚 References
-
-- [KITTI Dataset Paper](http://www.cvlibs.net/publications/Geiger2013IJRR.pdf)
-- [Computer Vision: Algorithms and Applications](http://szeliski.org/Book/)
-- [Multiple View Geometry](https://www.robots.ox.ac.uk/~vgg/hzbook/)
+Perfect for learning computer vision, autonomous vehicle perception, or multi-object tracking algorithms!
 
