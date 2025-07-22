@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-Multi-Object Tracker using Kalman Filter and Nearest Neighbor Association
+Multi-Object Tracker using Kalman Filter and Hungarian Algorithm Association
 
 This module implements a complete multi-object tracker that:
 1. Uses Kalman filters to track individual objects
-2. Performs data association using nearest neighbor
+2. Performs optimal data association using the Hungarian algorithm
 3. Handles track initialization and termination
 4. Provides visualization capabilities
 
 Dependencies:
 - numpy
+- scipy (for linear_sum_assignment)
 - kalman_filter module
 - multi_frame_pipeline module
 """
@@ -22,6 +23,7 @@ from enum import Enum
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import os
+from scipy.optimize import linear_sum_assignment
 
 # Import our custom modules
 from kalman_filter import KalmanFilter
@@ -88,10 +90,13 @@ class Track:
 
 class MultiObjectTracker:
     """
-    Multi-Object Tracker using Kalman Filter and Nearest Neighbor Association
+    Multi-Object Tracker using Kalman Filter and Hungarian Algorithm Association
     
-    This class manages multiple object tracks and performs data association
-    between detections and existing tracks.
+    This class manages multiple object tracks and performs optimal data association
+    between detections and existing tracks using the Hungarian algorithm.
+    
+    The Hungarian algorithm solves the assignment problem optimally, ensuring
+    the minimum total cost assignment between tracks and detections.
     """
     
     def __init__(self, max_distance: float = 5.0, dt: float = 0.1):
@@ -145,7 +150,7 @@ class MultiObjectTracker:
     
     def _associate_detections_to_tracks(self, detections: List[Detection]) -> Tuple[List[Tuple[int, int]], List[int], List[int]]:
         """
-        Associate detections to tracks using nearest neighbor
+        Associate detections to tracks using the Hungarian algorithm (optimal assignment)
         
         Args:
             detections: List of detections
@@ -158,28 +163,22 @@ class MultiObjectTracker:
         
         cost_matrix = self._calculate_cost_matrix(detections)
         
+        # Use Hungarian algorithm for optimal assignment
+        track_indices, detection_indices = linear_sum_assignment(cost_matrix)
+        
         matches = []
         unmatched_detections = list(range(len(detections)))
         unmatched_tracks = list(range(len(self.tracks)))
         
-        # Simple nearest neighbor association
-        for track_idx in range(len(self.tracks)):
-            if track_idx not in unmatched_tracks:
-                continue
-                
-            min_cost = float('inf')
-            best_det_idx = -1
-            
-            for det_idx in unmatched_detections:
-                cost = cost_matrix[track_idx, det_idx]
-                if cost < min_cost and cost < self.max_distance:
-                    min_cost = cost
-                    best_det_idx = det_idx
-            
-            if best_det_idx != -1:
-                matches.append((track_idx, best_det_idx))
-                unmatched_detections.remove(best_det_idx)
-                unmatched_tracks.remove(track_idx)
+        # Process the optimal assignments
+        for track_idx, det_idx in zip(track_indices, detection_indices):
+            # Only accept assignments below the distance threshold
+            if cost_matrix[track_idx, det_idx] < self.max_distance:
+                matches.append((track_idx, det_idx))
+                if det_idx in unmatched_detections:
+                    unmatched_detections.remove(det_idx)
+                if track_idx in unmatched_tracks:
+                    unmatched_tracks.remove(track_idx)
         
         return matches, unmatched_detections, unmatched_tracks
     
@@ -247,19 +246,24 @@ class MultiObjectTracker:
         """Remove tracks marked for deletion"""
         self.tracks = [track for track in self.tracks if track.state != TrackState.DELETED]
     
-    def update(self, detections: List[Detection]) -> None:
+    def update(self, detections: List[Detection], verbose: bool = False) -> None:
         """
         Update tracker with new detections
         
         Args:
             detections: List of detections for current frame
+            verbose: Whether to print cost matrix details for debugging
         """
         start_time = time.time()
         
         # Step 1: Predict all tracks
         self.predict()
         
-        # Step 2: Data association
+        # Optional: Print cost matrix for debugging
+        if verbose:
+            self.print_cost_matrix(detections, verbose=True)
+        
+        # Step 2: Data association using Hungarian algorithm
         matches, unmatched_detections, unmatched_tracks = self._associate_detections_to_tracks(detections)
         
         # Step 3: Update matched tracks
@@ -320,6 +324,52 @@ class MultiObjectTracker:
             print(f"  Track {track.id}: {track.state.value}, "
                   f"pos=[{pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}], "
                   f"speed={speed:.2f}, hits={track.hits}, age={track.age}")
+
+    def print_cost_matrix(self, detections: List[Detection], verbose: bool = False) -> None:
+        """
+        Print the cost matrix for debugging Hungarian algorithm
+        
+        Args:
+            detections: List of current detections
+            verbose: Whether to print detailed cost matrix
+        """
+        if not self.tracks or not detections or not verbose:
+            return
+            
+        cost_matrix = self._calculate_cost_matrix(detections)
+        
+        print(f"\n{'='*50}")
+        print("COST MATRIX (Hungarian Algorithm Input)")
+        print(f"{'='*50}")
+        print(f"Tracks: {len(self.tracks)}, Detections: {len(detections)}")
+        
+        # Header
+        header = "      "
+        for j in range(len(detections)):
+            header += f"  Det{j:2d} "
+        print(header)
+        
+        # Matrix rows
+        for i in range(len(self.tracks)):
+            row = f"Trk{i:2d} "
+            for j in range(len(detections)):
+                row += f"{cost_matrix[i, j]:6.2f} "
+            print(row)
+        
+        # Show Hungarian assignment
+        from scipy.optimize import linear_sum_assignment
+        track_indices, detection_indices = linear_sum_assignment(cost_matrix)
+        
+        print(f"\nHungarian Algorithm Assignment:")
+        total_cost = 0
+        for track_idx, det_idx in zip(track_indices, detection_indices):
+            cost = cost_matrix[track_idx, det_idx]
+            if cost < self.max_distance:
+                print(f"  Track {track_idx} -> Detection {det_idx} (cost: {cost:.3f}) ✓")
+                total_cost += cost
+            else:
+                print(f"  Track {track_idx} -> Detection {det_idx} (cost: {cost:.3f}) ✗ (above threshold)")
+        print(f"Total assignment cost: {total_cost:.3f}")
 
 
 class TrackingVisualizer:
