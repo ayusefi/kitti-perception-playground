@@ -6,8 +6,7 @@ data/
 
 frm_*.png
 
-tracking_*.png
-
+tracking/
 objects/
 
 # Python cache

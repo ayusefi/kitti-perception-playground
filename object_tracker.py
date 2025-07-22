@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from enum import Enum
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from matplotlib import patches
 import os
 from scipy.optimize import linear_sum_assignment
 
@@ -392,26 +393,126 @@ class TrackingVisualizer:
         self.x_min, self.x_max = -80, 80
         self.y_min, self.y_max = -30, 50
     
-    def plot_frame(self, detections: List[Detection], frame_idx: int) -> None:
+class TrackingVisualizer:
+    """
+    Enhanced visualizer for tracking results with point cloud and bounding boxes
+    """
+    
+    def __init__(self, tracker: MultiObjectTracker):
         """
-        Plot current frame with tracks and detections
+        Initialize visualizer
+        
+        Args:
+            tracker: MultiObjectTracker instance
+        """
+        self.tracker = tracker
+        self.fig, self.ax = plt.subplots(figsize=(16, 12))
+        self.colors = plt.cm.Set3(np.linspace(0, 1, 20))  # 20 different colors
+        
+        # Fixed axis limits for consistent frame size
+        self.x_min, self.x_max = -80, 80
+        self.y_min, self.y_max = -30, 50
+        
+        # Store pipeline reference for point cloud access
+        self.pipeline = None
+        
+    def set_pipeline(self, pipeline):
+        """Set pipeline reference for accessing point cloud data"""
+        self.pipeline = pipeline
+
+    def plot_frame(self, detections: List[Detection], frame_idx: int, show_point_cloud: bool = True) -> None:
+        """
+        Plot current frame with tracks, detections, point cloud, and bounding boxes
         
         Args:
             detections: Current detections
             frame_idx: Frame index
+            show_point_cloud: Whether to show the point cloud
         """
         self.ax.clear()
         
-        # Plot detections as red circles
+        # Plot point cloud if available and requested
+        if show_point_cloud and self.pipeline is not None:
+            try:
+                # Load raw point cloud
+                pcd = self.pipeline.single_frame_pipeline.load_point_cloud(frame_idx)
+                points = np.asarray(pcd.points)
+                
+                # Filter points within view range and reasonable height
+                mask = ((points[:, 0] >= self.x_min) & (points[:, 0] <= self.x_max) & 
+                       (points[:, 1] >= self.y_min) & (points[:, 1] <= self.y_max) &
+                       (points[:, 2] >= -3) & (points[:, 2] <= 5))  # Reasonable height range
+                filtered_points = points[mask]
+                
+                # Downsample for visualization performance (every 10th point)
+                if len(filtered_points) > 5000:
+                    step = len(filtered_points) // 5000
+                    filtered_points = filtered_points[::step]
+                
+                # Plot point cloud as small gray dots (consistent color)
+                if len(filtered_points) > 0:
+                    self.ax.scatter(filtered_points[:, 0], filtered_points[:, 1], 
+                                  c='gray', s=0.8, alpha=0.4, label='LiDAR Points')
+                    
+            except Exception as e:
+                print(f"Warning: Could not load point cloud for frame {frame_idx}: {e}")
+        
+        # Plot detection bounding boxes and points
         if detections:
-            det_positions = np.array([det.center for det in detections])
-            self.ax.scatter(det_positions[:, 0], det_positions[:, 1], 
-                          c='red', s=100, alpha=0.7, label='Detections', marker='o')
-            
-            # Add detection IDs
+            valid_detections = []
             for i, det in enumerate(detections):
-                self.ax.annotate(f'D{i}', (det.center[0], det.center[1]), 
-                               xytext=(5, 5), textcoords='offset points', fontsize=8, color='red')
+                # Filter out oversized bounding boxes (likely not real objects)
+                dims = det.dimensions
+                max_vehicle_length = 15.0  # Maximum reasonable vehicle length (meters)
+                max_vehicle_width = 4.0    # Maximum reasonable vehicle width (meters)
+                
+                # Skip detections that are too large to be realistic vehicles
+                if dims[0] > max_vehicle_length or dims[1] > max_vehicle_width:
+                    continue
+                    
+                valid_detections.append((i, det))
+            
+            for det_idx, (original_idx, det) in enumerate(valid_detections):
+                # Plot detection points in consistent colors based on detection index
+                if hasattr(det, 'points') and len(det.points) > 0:
+                    det_color = self.colors[det_idx % len(self.colors)]
+                    
+                    # Filter detection points within view
+                    det_points = det.points
+                    mask = ((det_points[:, 0] >= self.x_min) & (det_points[:, 0] <= self.x_max) & 
+                           (det_points[:, 1] >= self.y_min) & (det_points[:, 1] <= self.y_max))
+                    visible_points = det_points[mask]
+                    
+                    if len(visible_points) > 0:
+                        # Plot object points
+                        self.ax.scatter(visible_points[:, 0], visible_points[:, 1], 
+                                      c=[det_color], s=15, alpha=0.8, edgecolors='black', linewidth=0.5)
+                
+                # Draw bounding box for valid detections only
+                center = det.center
+                dims = det.dimensions
+                
+                # Create rectangle for bounding box (top-down view)
+                box_x = center[0] - dims[0]/2
+                box_y = center[1] - dims[1]/2
+                box_width = dims[0]
+                box_height = dims[1]
+                
+                # Draw bounding box rectangle
+                bbox_color = self.colors[det_idx % len(self.colors)]
+                rect = patches.Rectangle((box_x, box_y), box_width, box_height,
+                                       linewidth=2, edgecolor=bbox_color, facecolor=bbox_color, alpha=0.2)
+                self.ax.add_patch(rect)
+                
+                # Plot detection center as larger circle
+                self.ax.scatter(center[0], center[1], c='red', s=100, alpha=0.9, 
+                              marker='o', edgecolors='black', linewidth=2, label='Detection Centers' if det_idx == 0 else "")
+                
+                # Add detection ID labels
+                self.ax.annotate(f'D{det_idx}', (center[0], center[1]), 
+                               xytext=(5, 5), textcoords='offset points', 
+                               fontsize=10, fontweight='bold', color='red',
+                               bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
         
         # Plot tracks with different colors and trajectories
         for track in self.tracker.get_all_tracks():
@@ -421,76 +522,98 @@ class TrackingVisualizer:
             # Plot current position with different markers for track states
             if track.state == TrackState.CONFIRMED:
                 marker = 'o'
-                size = 150
+                size = 200
                 alpha = 1.0
+                edge_width = 3
             else:  # TENTATIVE
                 marker = '^'
-                size = 100
-                alpha = 0.6
+                size = 150
+                alpha = 0.7
+                edge_width = 2
             
             self.ax.scatter(pos[0], pos[1], c=[track_color], s=size, 
-                          marker=marker, alpha=alpha, edgecolors='black', linewidth=1)
+                          marker=marker, alpha=alpha, edgecolors='white', linewidth=edge_width)
             
-            # Add track ID labels
+            # Add track ID labels with background
             self.ax.annotate(f'T{track.id}', (pos[0], pos[1]), 
-                           xytext=(5, -15), textcoords='offset points', 
-                           fontsize=10, fontweight='bold', color='black',
-                           bbox=dict(boxstyle='round,pad=0.3', facecolor=track_color, alpha=0.7))
+                           xytext=(8, -20), textcoords='offset points', 
+                           fontsize=12, fontweight='bold', color='white',
+                           bbox=dict(boxstyle='round,pad=0.4', facecolor=track_color, alpha=0.9, edgecolor='black'))
             
             # Plot trajectory history
             history = self.tracker.get_track_history(track.id)
             if len(history) > 1:
                 history_array = np.array(history)
                 self.ax.plot(history_array[:, 0], history_array[:, 1], 
-                           c=track_color, alpha=0.8, linewidth=2, linestyle='-')
+                           c=track_color, alpha=0.8, linewidth=3, linestyle='-')
                 
                 # Add dots for historical positions
                 self.ax.scatter(history_array[:-1, 0], history_array[:-1, 1], 
-                              c=track_color, s=20, alpha=0.4)
+                              c=track_color, s=30, alpha=0.5, edgecolors='black', linewidth=0.5)
             
-            # Plot velocity vector as arrow (shorter arrows)
+            # Plot velocity vector as arrow
             vel = track.get_velocity()
             if np.linalg.norm(vel) > 0.5:  # Only show significant velocities
-                # Scale down the arrow length significantly
-                arrow_scale = 0.3  # Much shorter arrows
+                arrow_scale = 0.3  # Scale down arrows
                 self.ax.arrow(pos[0], pos[1], vel[0] * arrow_scale, vel[1] * arrow_scale, 
-                            head_width=0.8, head_length=0.6, 
-                            fc=track_color, ec=track_color, alpha=0.8, linewidth=1.5)
+                            head_width=1.2, head_length=1.0, 
+                            fc=track_color, ec='black', alpha=0.9, linewidth=2)
         
         # Customize plot
-        self.ax.set_xlabel('X Position (meters)', fontsize=12)
-        self.ax.set_ylabel('Y Position (meters)', fontsize=12)
-        self.ax.set_title(f'Multi-Object Tracking - Frame {frame_idx}\n'
+        self.ax.set_xlabel('X Position (meters)', fontsize=14, fontweight='bold')
+        self.ax.set_ylabel('Y Position (meters)', fontsize=14, fontweight='bold')
+        
+        # Count valid detections after filtering
+        valid_detections_count = sum(1 for det in detections 
+                                   if det.dimensions[0] <= 15.0 and det.dimensions[1] <= 4.0) if detections else 0
+        
+        self.ax.set_title(f'KITTI Multi-Object Tracking - Frame {frame_idx}\n'
                          f'Active Tracks: {len(self.tracker.get_active_tracks())}, '
-                         f'Detections: {len(detections)}', fontsize=14)
-        self.ax.grid(True, alpha=0.3)
+                         f'Valid Detections: {valid_detections_count}', fontsize=16, fontweight='bold')
+        self.ax.grid(True, alpha=0.4, linestyle='--')
         
         # Use fixed axis limits for consistent frame size
         self.ax.set_xlim(self.x_min, self.x_max)
         self.ax.set_ylim(self.y_min, self.y_max)
         
-        # Legend
+        # Enhanced legend
         legend_elements = []
         if detections:
+            # Count valid detections after filtering
+            valid_count = sum(1 for det in detections 
+                            if det.dimensions[0] <= 15.0 and det.dimensions[1] <= 4.0)
+            
+            if valid_count > 0:
+                legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
+                                                markerfacecolor='red', markersize=12, 
+                                                label='Detection Centers', alpha=0.9, markeredgecolor='black'))
+                legend_elements.append(patches.Rectangle((0, 0), 1, 1, facecolor='lightblue', 
+                                                       alpha=0.3, edgecolor='blue', linewidth=2,
+                                                       label='Bounding Boxes'))
+        
+        confirmed_tracks = [t for t in self.tracker.tracks if t.state == TrackState.CONFIRMED]
+        if confirmed_tracks:
             legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
-                                            markerfacecolor='red', markersize=10, 
-                                            label='Detections', alpha=0.7))
-        if self.tracker.get_active_tracks():
-            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
-                                            markerfacecolor='blue', markersize=12, 
-                                            label='Confirmed Tracks'))
+                                            markerfacecolor='blue', markersize=14, 
+                                            label='Confirmed Tracks', markeredgecolor='white', markeredgewidth=2))
+        
         tentative_tracks = [t for t in self.tracker.tracks if t.state == TrackState.TENTATIVE]
         if tentative_tracks:
             legend_elements.append(plt.Line2D([0], [0], marker='^', color='w', 
-                                            markerfacecolor='gray', markersize=10, 
-                                            label='Tentative Tracks', alpha=0.6))
+                                            markerfacecolor='orange', markersize=12, 
+                                            label='Tentative Tracks', alpha=0.7))
+        
+        if show_point_cloud:
+            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
+                                            markerfacecolor='gray', markersize=6, 
+                                            label='LiDAR Points', alpha=0.6))
         
         if legend_elements:
-            self.ax.legend(handles=legend_elements, loc='upper right')
+            self.ax.legend(handles=legend_elements, loc='upper right', fontsize=11, framealpha=0.9)
         
         plt.tight_layout()
     
-    def save_frame(self, detections: List[Detection], frame_idx: int, output_path: str) -> None:
+    def save_frame(self, detections: List[Detection], frame_idx: int, output_path: str, show_point_cloud: bool = True) -> None:
         """
         Save current frame plot
         
@@ -498,8 +621,9 @@ class TrackingVisualizer:
             detections: Current detections
             frame_idx: Frame index
             output_path: Path to save the plot
+            show_point_cloud: Whether to show the point cloud
         """
-        self.plot_frame(detections, frame_idx)
+        self.plot_frame(detections, frame_idx, show_point_cloud)
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
         print(f"Saved tracking visualization to {output_path}")
     
@@ -569,6 +693,9 @@ def main():
     pipeline = MultiFramePerceptionPipeline(data_path, perception_config)
     tracker = MultiObjectTracker(max_distance=3.0, dt=0.1)
     visualizer = TrackingVisualizer(tracker)
+    
+    # Set pipeline reference for point cloud visualization
+    visualizer.set_pipeline(pipeline)
     
     # Process sequence
     start_frame = 0
